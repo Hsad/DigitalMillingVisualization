@@ -33,6 +33,15 @@
 	var delay = 30;
 	var LSys;
 
+	var GlobalHeightMod = 0;
+	var GHModInc = 0.0001;
+
+	var SuperLineMesh;
+	var redLineMat;
+	var redSuperLineMesh;
+	var greenLineMat;
+	var greenSuperLineMesh;
+
 	//base stuff
 	var basicMaterial;
 
@@ -50,14 +59,13 @@ function init(){
 	geometry.translate(0,0,-0.003)
 	material = new THREE.MeshLambertMaterial( { color: 0x002200 } );
 	plane = new THREE.Mesh( geometry, material );
-	scene.add( plane );
+	//scene.add( plane );
 	
 	directionalLight = new THREE.DirectionalLight( 0x555555, 100 );
 	directionalLight.position.set( 1, 10,1 );
 	directionalLight.rotation.x = 0.8;
 	scene.add( directionalLight );
 	
-	LineMat = new THREE.LineBasicMaterial( { color: 0x444444 } );
 	//projector = new THREE.Projector();
 	raycaster = new THREE.Raycaster();
 	raycaster.linePrecision = 0.001;
@@ -65,7 +73,7 @@ function init(){
 	basicMaterial = new THREE.MeshBasicMaterial({ color: 0xff5555	});
 
 	camera.position.z = 2;
-	camera.position.y = -1; //lil hight boost, lil less
+	camera.position.y = -1000; //lil hight boost, lil less
 	camera.position.x = 0; 
 	camera.rotation.x = 0.5;
 
@@ -74,7 +82,7 @@ function init(){
 	window.addEventListener("resize", onWindowResize, false);
 	
 	
-	Math.seedrandom(0)
+	//Math.seedrandom(0)
 	console.log(Math.random());
 	
 	
@@ -87,17 +95,54 @@ function init(){
 	//drawLine(1,1,0,0);
 	//recursiveLine([0,0], 0, 4);
 	
-	//debugFunc();
 
 	var vec2 = new THREE.Vector2(1,0);
-	console.log(vec2);
+	//console.log(vec2);
 	var vec22 = vec2.rotateAround({x:0, y:0}, Math.PI/2);
-	console.log(vec2);
-	console.log(vec22);
-	
+	//console.log(vec2);
+	//console.log(vec22);
 
-	LSys = new LSystem(); 
-	LSys.Seed();
+
+	LineMat = new THREE.LineBasicMaterial( { color: 0x444444 } );
+	var emptyGeo = new THREE.BufferGeometry();
+	var VertPos = new Float32Array( 10000 * 3);
+	emptyGeo.addAttribute( "position" ,  new THREE.BufferAttribute(VertPos, 3) );
+	emptyGeo.drawRange.count = 2;
+	emptyGeo.computeBoundingSphere();
+	SuperLineMesh = new THREE.LineSegments(emptyGeo, LineMat);
+	scene.add(SuperLineMesh);
+//debug lines
+	redLineMat = new THREE.LineBasicMaterial( { color: 0xff4444 } );
+	emptyGeo = new THREE.BufferGeometry();
+	VertPos = new Float32Array( 500000 * 3);
+	emptyGeo.addAttribute( "position" ,  new THREE.BufferAttribute(VertPos, 3) );
+	emptyGeo.drawRange.count = 2;
+	emptyGeo.computeBoundingSphere();
+	redSuperLineMesh = new THREE.LineSegments(emptyGeo, redLineMat);
+	scene.add(redSuperLineMesh);
+
+	//3D line mesh
+	greenLineMat = new THREE.LineBasicMaterial( { color: 0x44ff44 } );
+	emptyGeo = new THREE.BufferGeometry();
+	VertPos = new Float32Array( 250000 * 3);
+	emptyGeo.addAttribute( "position" ,  new THREE.BufferAttribute(VertPos, 3) );
+	emptyGeo.drawRange.count = 2;
+	emptyGeo.computeBoundingSphere();
+	greenSuperLineMesh = new THREE.Line(emptyGeo, greenLineMat);
+	scene.add(greenSuperLineMesh);
+	//
+	//3D line mesh blue version
+	blueLineMat = new THREE.LineBasicMaterial( { color: 0x2244ff } );
+	emptyGeo = new THREE.BufferGeometry();
+	VertPos = new Float32Array( 250000 * 3);
+	emptyGeo.addAttribute( "position" ,  new THREE.BufferAttribute(VertPos, 3) );
+	emptyGeo.drawRange.count = 2;
+	emptyGeo.computeBoundingSphere();
+	blueSuperLineMesh = new THREE.Line(emptyGeo, blueLineMat);
+	scene.add(blueSuperLineMesh);
+
+	//LSys = new LSystem(); 
+	//LSys.Seed();
 	//what is this passed?  A city type?  a seed?  Do I create many
 	//and those are placed out in the world and eventually connect to each other?
 	//Do I need an infulence map?
@@ -106,36 +151,309 @@ function init(){
 	//is there a good way to get the road system to build visably
 	//probably by starting it here and having it update the stack once per update
 	
-
+	/*  HARDWICK this section generates demo data that was used to verify the 
+	 *  proper functionality of the projection algorithm*/
+	//P1 = testData(9,9,9,1,1000,0.1);
+	//P2 = testData(9,9,9,20,6000,0.2);
+	//readPoints(P1);
+	//readPointsBlue(P2);
+	//compPoints2(P1,P2);
+	
+	//Calling line drawer
+	//readPoints(pathPoints)
+	readPointsBlue(pathPoints2)
+	readPoints(pathPoints3)
+	compPoints2(pathPoints3, pathPoints2);
+	
+	
 }
 
-function debugFunc(){
-	var mesh = new THREE.Mesh(new THREE.BoxGeometry(0.01,0.01,0.01), basicMaterial);
-	scene.add(mesh);
-	var mesh2 = new THREE.Mesh(new THREE.BoxGeometry(0.01,0.01,0.01), basicMaterial);
-	scene.add(mesh2);
-	mesh.position.set(0,0,0);
-	var x = 0.3;
-	var y = 0.4;
-	mesh2.position.set(x,y,0);
-	var ang = Math.atan2(y, x);
-	drawLine(0,0,Math.cos(ang), Math.sin(ang));
+function testData(X,Y,Z,Off,count,spread){
+	arr = [];
+	for (var c = 0; c < count; c++){
+		arr.push( { x:Off + X*spread*c, y:Y*spread*c, z:Z*spread*c } );
+	}	
+	return arr;
+}
 
-	var tes = { 
-		name : "hello",
-		angle: 16,
-		list: [1,3,5,3]
-	};
-	console.log(tes.name);
-	console.log(tes.angle);
-	console.log(tes.list[2]);
+function compPoints2(input, results){
+	console.log(input);
+	console.log(results);
+	var I = 1;
+	var R = 0;
+	var i0;
+	var i1;
+	var r;
+	var L;
+	var P;
+	var PL;
+	var graphData = []
+	while (true){
+		//console.log("loopin");
+		i0 = input[I];
+		i1 = input[I + 1];
+		r = results[R];
+
+		//console.log(i0);
+		//console.log(i1);
+		//console.log(r);
+		L = subVec(i1, i0);
+		//console.log(i0);
+		//console.log(i1);
+		//console.log(r);
+		P = subVec(r, i0);
+		PL = project(P,L);
+		if (isNeg(PL,L)){
+			//increment P
+			R++;
+		} else if (greaterThanVec(PL,L)){
+			//incerement L index
+			I++
+		} else if (lessThanEqualVec(PL,L)){
+			//project and draw P onto L
+			gapEnd = addVec(PL, i0); //convert aback to world space
+			reddrawLine(r.x, r.y, r.z, gapEnd.x, gapEnd.y, gapEnd.z);
+
+			gap = subVec(gapEnd, PL); //convert gap to local space
+			graphData.push( Math.sqrt( gap.x*gap.x + gap.y*gap.y + gap.z*gap.z ) );
+			
+			console.log(I);
+			console.log(R);
+			if ( R > 2000){
+				break;
+			}
+
+			//incremernt P
+			R++;
+			//console.log("drawing");
+		} else{
+			//val must be 0
+			console.log("error");
+			//increment P;
+			I++;
+		}
+		if (I+1 >= input.length || R >= results.length){
+			break;
+		} 
+	}
+	console.log(I);
+	console.log(R);
+}
+
+
+function isNeg(A,B){
+	if ( (A.x * B.x) >= 0 && (A.y * B.y) >= 0 && (A.z * B.z) >= 0 ){
+		return false;
+	}
+	return true;
+}
+
+function project(linePB,lineAB){
+	return multiplyVec( (dotProd(linePB,lineAB) / dotProd(lineAB,lineAB)), lineAB );
+}
+
+function comparePoints(input, results){
+	console.log(input);
+	console.log(results);
+	//input = ideal
+	//results = actual
+	var I = 1;
+	var R = 15;
+	var dist = 0;
+	var ip;
+	var ic;
+	var rp;
+	var rc;
+	var ipd;
+	var ropd;
+	var graphData = [];
+	while(true){
+		ip = input[I-1]; //these are xyz vectors
+		ic = input[I];
+		//ix = input[I+1]; //i next
+
+		rp = results[R-1];
+		rc = results[R];
+		//rx = results[R+1]; //i next
+		//
+		//console.log("Printing fresh variables");
+		//console.log(ip);
+		//console.log(ic);
+		//console.log(rp);
+		//console.log(rc);
+
+		ipd =  subVec(ip, ic); //might need to swap to a sub function
+		//ind =  subVec(ix, ic);
+		//iod =  subVec(rc, ic);
+		//iopd = subVec(rp, ic);
+		//iond = subVec(rx, ic);
+                        
+		//rpd =  subVec(rp, rc); //might need to swap to a sub function
+		//rnd =  subVec(rx, rc);
+		//rod =  subVec(ic, rc);
+		ropd = subVec(ip, rc);
+		//rond = subVec(ix, rc);
+		console.log(I);
+		console.log(R);
+		
+		if (greaterThanVec(ropd, ipd)){
+			//project line to ip<->ic from rc, set rc = rn (increment R)
+			dist = projectAndDraw( rc, ip, ic);
+			R++;
+		} else if (greaterThanVec(ipd, ropd)){
+			//project line from rp<->rc from ic, ic = ix (inc I)
+			dist = projectAndDraw( ic, rp, rc);
+			I++;
+		}	else{
+			//somehow at the same point
+			R++;
+			I++;
+			gap = subVec(ic, rc);
+			dist = Math.sqrt( gap.x*gap.x + gap.y*gap.y + gap.z*gap.z );
+			if (dist > 0){
+				//console.log("Offset error of");
+				//console.log(dist);
+			}
+		}
+		graphData.push(dist);
+		//increment
+		//TODO More finess on which is getting incremented
+		if (I >= input.length || R >= results.length){
+			break;
+		} 
+	}
+	console.log("done");
+	//console.log(graphData);
+}
+
+function dotProd(A, B){
+	//console.log(A);
+	//console.log(B);
+	return A.x*B.x + A.y*B.y + A.z*B.z;
+}
+
+function projectAndDraw(point, lineA, lineB){
+	//calc projection vector
+	lineAB = subVec(lineA, lineB); //create local space
+	linePB = subVec(point, lineB);
+	
+	projVec = multiplyVec( (dotProd(linePB,lineAB) / dotProd(lineAB,lineAB)), lineAB );
+	//draw line from point to projVec+lineB 
+	gapEnd = addVec(projVec, lineB); //convert aback to world space
+	reddrawLine(point.x, point.y, point.z, gapEnd.x, gapEnd.y, gapEnd.z);
+	//console.log("After print red in project");
+	
+	gap = subVec(gapEnd, linePB); //convert gap to local space
+	return Math.sqrt( gap.x*gap.x + gap.y*gap.y + gap.z*gap.z );
+}
+
+function lessThanEqualVec(A, B){
+	return (Math.sqrt( A.x*A.x + A.y*A.y + A.z*A.z )) <= (Math.sqrt( B.x*B.x + B.y*B.y + B.z*B.z ));
+}
+
+function greaterThanVec(A, B){
+	return (Math.sqrt( A.x*A.x + A.y*A.y + A.z*A.z )) > (Math.sqrt( B.x*B.x + B.y*B.y + B.z*B.z ));
+}
+
+function multiplyVec(scalar, vec){
+	return { x: vec.x*scalar, y: vec.y*scalar, z: vec.z*scalar };
+}
+
+function addVec(A, B){
+	return { x: (A.x+B.x), y: (A.y+B.y), z: (A.z+B.z) };
+}
+
+function subVec(A, B){
+	//console.log(A);
+	//console.log(B);
+	return { x: (A.x-B.x), y: (A.y-B.y), z: (A.z-B.z) };
+}
+
+function readPoints(points){ //color could be passed in as well
+	// read in the points, place them in order with lines between them all
+	//TODO then calculate the speed and animate a ball moving in order between all of them
+	for (var n = 0; n < points.length; n++){
+		drawContinuedLine(points[n].x, points[n].y, points[n].z);
+		//redLineUp(points[n].x, points[n].y, points[n].z);
+	}
+	//console.log("Hello");
+}
+
+function readPointsBlue(points){ //color could be passed in as well
+	// read in the points, place them in order with lines between them all
+	//TODO then calculate the speed and animate a ball moving in order between all of them
+	for (var n = 0; n < points.length; n++){
+		drawContinuedLineBlue(points[n].x, points[n].y, points[n].z);
+		//redLineUp(points[n].x, points[n].y, points[n].z);
+	}
+	//console.log("Hello");
+}
+
+function c(pri){
+	console.log(pri);
+}
+
+function drawContinuedLine(x,y,z){
+	var pos = greenSuperLineMesh.geometry.getAttribute('position');
+	var drawRangeNum = greenSuperLineMesh.geometry.drawRange.count;
+
+	pos.setXYZ(drawRangeNum, x, y, z);
+
+	pos.needsUpdate = true;
+	greenSuperLineMesh.geometry.drawRange.count += 1;
+	//console.log("drawing");
+}
+
+function drawContinuedLineBlue(x,y,z){
+	var pos = blueSuperLineMesh.geometry.getAttribute('position');
+	var drawRangeNum = blueSuperLineMesh.geometry.drawRange.count;
+
+	pos.setXYZ(drawRangeNum, x, y, z);
+
+	pos.needsUpdate = true;
+	blueSuperLineMesh.geometry.drawRange.count += 1;
+	//console.log("drawing");
 }
 
 function drawLine(point1x, point1y, point2x, point2y){
-	var geo = new THREE.Geometry();
-	geo.vertices.push(new THREE.Vector3(point1x, point1y, 0), new THREE.Vector3(point2x, point2y, 0));
-	var mesh = new THREE.Line(geo, LineMat);
-	scene.add(mesh);
+	var pos = SuperLineMesh.geometry.getAttribute('position');
+	var drawRangeNum = SuperLineMesh.geometry.drawRange.count;
+
+	pos.setXYZ(drawRangeNum, point1x, point1y, 0);
+	pos.setXYZ(drawRangeNum + 1, point2x, point2y, 0);
+	//pos.setXYZ(drawRangeNum, point1x, point1y, GlobalHeightMod);
+	//pos.setXYZ(drawRangeNum + 1, point2x, point2y, GlobalHeightMod);
+	pos.needsUpdate = true;
+
+	//GlobalHeightMod += GHModInc;
+
+	SuperLineMesh.geometry.drawRange.count += 2;
+
+}
+
+function redLineUp(x,y,z){
+	reddrawLine(x,y,z,x,y,z+5);
+}
+
+//redDebug
+function reddrawLine(point1x, point1y, point1z, point2x, point2y, point2z){
+	//if (Math.random() < 0.99){
+	//	return;
+	//}
+	var pos = redSuperLineMesh.geometry.getAttribute('position');
+	var drawRangeNum = redSuperLineMesh.geometry.drawRange.count;
+
+	pos.setXYZ(drawRangeNum, point1x, point1y, point1z);
+	pos.setXYZ(drawRangeNum + 1, point2x, point2y, point2z);
+	//pos.setXYZ(drawRangeNum, point1x, point1y, GlobalHeightMod);
+	//pos.setXYZ(drawRangeNum + 1, point2x, point2y, GlobalHeightMod);
+	pos.needsUpdate = true;
+
+	//GlobalHeightMod += GHModInc;
+
+	redSuperLineMesh.geometry.drawRange.count += 2;
+	console.log("Drawing red");
+
 }
 
 function drawLineAngle(point1x, point1y, angle){
@@ -167,17 +485,20 @@ function recursiveLine(last, angle, step){
 }
 
 function render() {
-	if (delay == 30){
-		delay = 0;
-		LSys.Expand();
-	}
-	delay++;
+	//if (delay >= 30){
+	//	delay = 0;
+	//	LSys.Expand();
+	//}
+	//delay++;
+	//console.log(delay);
 	//cycleVerts();
 	currentTime = Date.now();
 	deltaTime = (currentTime - lastTime) / 1000;
 	lastTime = currentTime;
 	//console.log(deltaTime);
-	requestAnimationFrame(render);	
+	setTimeout( function() {
+		requestAnimationFrame(render);	
+	}, 1000 / 30);
 	renderer.render(scene, camera);
 }
 

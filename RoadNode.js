@@ -19,3 +19,5 @@ RoadNode.prototype.GiveParent = function(parentNode){
 	this.AddAdjNode(parentNode);
 	parentNode.AddAdjNode(this);
 }
+
+//RoadNode.prototype.removeNode = 
